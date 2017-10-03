@@ -68,6 +68,20 @@ int convert_queue_to_state(deque<int> my_state, int R){
 	return out;
 }
 
+void print_array(float arr[],int arr_len){
+	/*Prints the array*/
+	for (auto it = arr ;it != arr + arr_len; it++){
+		cout << "\n" << *it;
+	}
+}
+void print_array(int arr[],int arr_len){
+	/*Prints the array*/
+	for (auto it = arr ;it != arr + arr_len; it++){
+		cout << "\n" << *it;
+	}
+}
+
+
 int convert_user_input_to_num(string valid_input,char user_input){
 	int break_flag = 0;
 	for(int i=0;i<valid_input.length();i++){
@@ -78,6 +92,45 @@ int convert_user_input_to_num(string valid_input,char user_input){
 	}
 	cout << "User input bad!!! Terminating\n\n\n\n";
 	return -1;
+}
+
+int draw_sample(int trans_counts[],float prior_count){
+	/*
+	TO DO::
+	Takes in a distribution and draws a random variable from that distribution
+	
+	@params: dist contains the number of transitions. Need not be integer.
+	Returns: A character number : 1[P],2[R],3[S]
+	*/
+	int trans_counts_len = 1+(sizeof(trans_counts)/sizeof(*trans_counts));
+	float summed_trans[trans_counts_len+1];
+	summed_trans[0] = 0;
+ 	for (int i=0;i<trans_counts_len;i++){
+ 		cout << "\ni:" <<i;
+		summed_trans[i+1] = summed_trans[i] + trans_counts[i] + prior_count;
+	}
+
+	//Test the computed
+	cout << "\n\nlength is:" << trans_counts_len ;
+	print_array(summed_trans,trans_counts_len + 1);
+	print_array(trans_counts,trans_counts_len);
+	//Generate a random number
+    random_device rd;  //Will be used to obtain a seed for the random number engine
+    mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+    uniform_real_distribution<> dis(0,1);
+
+	float rand_number = dis(gen);
+	cout << "\nrandom number:" << rand_number;
+	cout << "The last number is:" << summed_trans[trans_counts_len];
+	rand_number = rand_number * summed_trans[trans_counts_len];
+	cout << "\nrandom number:" << rand_number;
+	//Get the lower bound of the nearest element
+	int pos = lower_bound(summed_trans,summed_trans+ trans_counts_len + 1,rand_number) - summed_trans;
+
+	cout << "\n\nThe position is:" << pos;
+	return pos;
+
+
 }
 
 char draw_from_dist(vector<float> dist){
@@ -96,7 +149,7 @@ typedef pair<int, int> Key; //pair
 
 
 int main(){
-	int R = 10;//Number of steps back you want to remember
+	int R = 3;//Number of steps back you want to remember
 	int tot_states = pow(3,R); //Note, the total states will increase if comps states are included
 	int initialize_from_previous = 0;
 	string filename_previous = "filename.txt";
@@ -184,22 +237,24 @@ int main(){
 				string possible_inputs = "PRS";
 				int transition_counts[3];//Counts the previously seen transitions
 
-				for (int char_temp = 0;char_temp<3;char_temp++){
-					//Somehow temporarily append a number to a queue and then remove it
+				for (int char_temp = 0;char_temp<= 2;++char_temp){
+					// Somehow temporarily append a number to a queue and then remove it
 					// TO DO - Add some logic here
-					queue<int> temp_queue;//Assume temp_queue holds this 
-					temp_queue = state_queue;
+					deque<int> temp_queue(state_queue);//Assume temp_queue holds this 
 					temp_queue.pop_back();
-					int num_char_temp = convert_user_input_to_num(valid_input, char_temp);
-					temp_queue.push_back(num_user_input)
-					int possible_new_state = convert_queue_to_state(temp_queue,R);
-					transition_counts[char_temp] = graph_state[make_pair(old_state,possible_new_state)];
+					int num_char_temp = convert_user_input_to_num(valid_input, valid_input[char_temp+ 1]);
+					temp_queue.push_back(num_user_input);
+					int possible_new_state;
+					possible_new_state = convert_queue_to_state(temp_queue,R);
 
+					transition_counts[char_temp] = graph_state[make_pair(old_state,possible_new_state)];
 				}
+
 				//transition counts holds the three transitions
 				//Draw a random sample based on these probabilities of transition
 				//Maybe just simply draw a random uniform and then use cdf concept
-				int int_comp_move;
+				float prior_count = 0.5;
+				int int_comp_move= draw_sample(transition_counts,prior_count);
 				//int_comp_move stores the computers move in integer value
 				char comp_move = valid_input[int_comp_move];
 
