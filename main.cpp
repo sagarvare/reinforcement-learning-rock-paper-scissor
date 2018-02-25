@@ -8,8 +8,25 @@
 #include <random>
 #include <queue>    
 #include <deque>      
+#include <string>
+#include <iterator>
+#include <sstream>
 
 using namespace std;
+
+vector<string> parse_CSV(string str1) {
+	stringstream ss(str1);
+	vector<string> result;
+
+    string i;
+	while( ss.good() )
+	{
+		string substr;
+		getline( ss, substr, ',' );
+		result.push_back( substr );
+	}
+    return result;
+}
 
 int ternary_to_decimal(vector<int> input ){
 	/*
@@ -22,11 +39,8 @@ int ternary_to_decimal(vector<int> input ){
 	int out = 0;
 	while(!input.empty()){
 		int temp = input.back();
-		cout << "Just testing \n";
 		input.pop_back();
 		out = out + temp*pow(3,(input.size()));
-		cout << "\nTemp is:" << temp ;
-		cout << "\n The input size is:" << input.size();
 	}
 	return out;
 }
@@ -90,6 +104,13 @@ void print_queue(deque<int> q)
     q.pop_front();
   }
   cout << endl;
+}
+
+
+void print_vector(vector<string> q)
+{
+  for (vector<string>::iterator i = q.begin(); i != q.end(); ++i)
+    cout << *i << '\n';
 }
 
 void print_map(map < pair<int,int> , float> myMap)
@@ -214,13 +235,23 @@ typedef pair<int, int> Key; //pair
 int main(){
 	int R = 3;//Number of steps back you want to remember
 	int tot_states = pow(3,R); //Note, the total states will increase if comps states are included
-	int initialize_from_previous = 0;
+	int initialize_from_previous = 1;
 	string filename_previous = "filename.txt";
+	string filename_logs = "game_play.log";
+
+	// char valid_input[] = {'R','P','S','E'};
+	string valid_input = "EPRS";
+
+	//valid game play input: PRS
+	string valid_move = "PRS";
+
 
 	// typedef pair<int, int> Key;
 	map < pair<int,int> , float> graph_state; //Check syntax for mapping from pair to a single transition number
 	vector<int> out2 = decimal_to_ternary(101);
 	int break_flag = 0;
+	int old_state, new_state;//These contain the state numbers
+	int counter = 0;//Number of moves played
 
 	deque<int>  state_queue; //Contains the current state , i.e. last R moves
 	char user_input;
@@ -232,20 +263,61 @@ int main(){
 		//Read the input?? Figure out how to save a map to and from the filename.txt
 		//Use this to check it out
 		cout << "Initialization from stored logs **NOT SUPPORTED** .This is just a tester inplace. I will add initializing logic later on.";
+
+		//Go through the files and initialize the state_vector and the graph state appropriately.
+		//Also make sure that the counter is also set appropriately
+		string line;
+		ifstream gameFile (filename_logs);
+		if (gameFile.is_open() ) {
+			while (getline(gameFile,line) ){
+				string move; //Move is the read in 
+				vector<string> results;
+				results = parse_CSV(line);
+				for (vector<string>::iterator i = results.begin(); i != results.end(); ++i){
+					string move = *i;
+					size_t found = valid_move.find(move);
+					if (found!=string::npos && move != ""){
+						//Add things to state_queue and make the game graph
+						cout << "\n\ngoing to add:" << move;
+						if (counter < R){
+							int num_user_input = convert_user_input_to_num(valid_input, move[0]);
+							state_queue.push_back(num_user_input);
+						}else{ //There are more than R number of moves already done
+							old_state = convert_queue_to_state(state_queue,R);
+							int num_user_input = convert_user_input_to_num(valid_input, move[0]);
+							state_queue.push_back(num_user_input); 
+							state_queue.pop_front();
+							new_state = convert_queue_to_state(state_queue,R);
+
+							//Update the current graph
+							if (graph_state.count(make_pair(old_state,new_state)) == 0){//Check syntax
+								//This is a state that has not been seen before
+								graph_state[make_pair(old_state,new_state)] = 1; //Check syntax
+							}else{
+								//This key is present
+								graph_state[make_pair(old_state,new_state)]= 1 + graph_state[make_pair(old_state,new_state)]; //Check syntax
+							}
+						}
+						counter++;
+
+  					}
+				}
+
+				cout << "\n\n";
+			}
+			gameFile.close();
+		}
+		else{
+			cout << "Unable to  open the FIle\n\n";
+		}
 	}
 
-	// char valid_input[] = {'R','P','S','E'};
-	string valid_input = "EPRS";
 
 	
 	//For generating random numbers
     mt19937 rng;
     rng.seed(random_device()());
     std::uniform_int_distribution<mt19937::result_type> dist6(1,3); // distribution in range [1, 6]
-
-
-
-	int counter = 0;//Number of moves played
 
 	//Open a file for logging all the users moves
 	string file_name = "game_play.log";
@@ -262,7 +334,8 @@ int main(){
 	ofstream outfile_WL;
 	outfile_WL.open(file_name_WL, ios_base::app);
 
-	int old_state, new_state;//These contain the state numbers
+	if (initialize_from_previous ==0){
+	}
 	int AI_loss = 0;
 	int AI_wins = 0;
 	int AI_draws = 0;
@@ -296,11 +369,12 @@ int main(){
 
 			//The first R moves are random
 			if (counter < R){
+				cout << "\n\n\n--------------------------------------ENTERING THE RANDOM PHASE!\n\n\n";
 				//Computer plays something randomly
 				char comp_move = valid_input[dist6(rng)];
 				outfile_computer << comp_move << ",";
 
-			    cout << "The computer played:" << comp_move << endl;
+			    cout << "--------------------------------------------The computer played:" << comp_move << endl;
 
 			    int result = check_result(num_user_input,comp_move);
 				//Add the move to the queue
@@ -335,7 +409,6 @@ int main(){
 				//Now the bug is gone, but I am left with horrible code
 
 				new_state = convert_queue_to_state(state_queue,R); 
-				// print_queue(new_state);
 
 
 				//Draw a random element from the graph before updating
@@ -346,45 +419,35 @@ int main(){
 					// Somehow temporarily append a number to a queue and then remove it
 					// TO DO - Add some logic here
 					deque<int> temp_queue(state_queue);//Assume temp_queue holds this 
-					cout<< "print temp queue";
-					print_queue(state_queue);
 					temp_queue.pop_back();
 					// int num_char_temp = convert_user_input_to_num(valid_input, valid_input[char_temp+ 1]);
 					temp_queue.push_back(char_temp);
 					int possible_new_state;
-					cout << "possible next queue";
-					print_queue(temp_queue);
 					possible_new_state = convert_queue_to_state(temp_queue,R);
-					cout << "next state" << possible_new_state << endl;
 					transition_counts[char_temp] = graph_state[make_pair(old_state,possible_new_state)];
-					cout << "transition count for this is:" << transition_counts[char_temp];
-
 				}
 
 				//transition counts holds the three transitions
 				//Draw a random sample based on these probabilities of transition
 				//Maybe just simply draw a random uniform and then use cdf concept
 				float prior_count = 0.5;
+				cout << "\n\n";
 				for (int it =0;it<3;it++){
-					cout << "Counts for playing the next one as:" << valid_input[it+ 1] << " is:" << transition_counts[it] <<"\n";
+					cout << "\nCounts for playing the next one as:" << valid_input[it+ 1] << " is:" << transition_counts[it];
 				}
 				int int_comp_move= draw_sample(transition_counts,prior_count);
 				//int_comp_move stores the computers move in integer value
 				char exp_move = valid_input[int_comp_move];
 				char comp_move = beating_move(exp_move);
-				cout << "Computer played:"<< comp_move << "\n";
-				cout << "This is the mod version";
+				cout << "\n\n----------------------------------Computer played:"<< comp_move << "\n";
 				//Update the state queue to keep track of this
 
 				//print the old state and the new state
-				print_queue(state_queue);
-				cout << "old_state" <<old_state<< endl;
 				state_queue.push_back(num_user_input);
 				state_queue.pop_front();
 
 				//Update the new state
 				new_state = convert_queue_to_state(state_queue,R); 
-				cout << "new_state" << new_state << endl;
 
 
 				//Log the comp_move? Maybe......No harm right? Useless data but still...Debugging purposes?
@@ -393,11 +456,9 @@ int main(){
 				//Update the current graph
 				if (graph_state.count(make_pair(old_state,new_state)) == 0){//Check syntax
 					//This is a state that has not been seen before
-					cout <<"old:" << old_state <<"   new_state:" << new_state <<endl;
 					graph_state[make_pair(old_state,new_state)] = 1; //Check syntax
 				}else{
 					//This key is present
-					cout <<"old:" << old_state <<"   new_state:" << new_state <<endl;
 					graph_state[make_pair(old_state,new_state)]= 1 + graph_state[make_pair(old_state,new_state)]; //Check syntax
 				}
 
