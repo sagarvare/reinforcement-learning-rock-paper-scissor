@@ -1,5 +1,5 @@
 all:
-	g++ main.cpp
+	g++ main.cpp helper.cpp
 run:
 	./a.out
 clean:
